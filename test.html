@@ -6939,6 +6939,77 @@
         // Initialize loading
         loadExplorerDb();
     </script>
+    <script>
+    /* ============================================================
+       PGN <-> URL Base64 Sync (monkey patch)
+       ============================================================
+       1. DESERIALIZE: On page load, if ?pgn=<b64> is in the URL,
+          decode it and call import_new_pgn() after the app inits.
+       2. SERIALIZE: Poll textbox_pgn_input.value and update the
+          URL bar via history.replaceState whenever it changes.
+       ============================================================ */
+    (function () {
+        // --- 1. DESERIALIZE on load ---
+        var params = new URLSearchParams(window.location.search);
+        var b64 = params.get('pgn');
+        if (b64) {
+            window.addEventListener('load', function () {
+                setTimeout(function () {
+                    try {
+                        var pgn = atob(b64);
+                        if (typeof import_new_pgn === 'function') {
+                            import_new_pgn(pgn);
+                        } else {
+                            // Fallback: write directly to textarea and dispatch input event
+                            var ta = document.getElementById('textbox_pgn_input');
+                            if (ta) {
+                                ta.value = pgn;
+                                ta.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[pgn-url] Failed to decode pgn param:', e);
+                    }
+                }, 600); // wait for app's own import_new_pgn('') to fire first
+            });
+        }
+
+        // --- 2. SERIALIZE: sync textarea -> URL ---
+        var lastPgn = null;
+        var debounceTimer = null;
+
+        function syncPgnToUrl() {
+            var ta = document.getElementById('textbox_pgn_input');
+            if (!ta) return;
+            var pgn = ta.value;
+            if (pgn === lastPgn) return;
+            lastPgn = pgn;
+            var url = new URL(window.location.href);
+            if (pgn && pgn.trim()) {
+                url.searchParams.set('pgn', btoa(pgn));
+            } else {
+                url.searchParams.delete('pgn');
+            }
+            history.replaceState(null, '', url.toString());
+        }
+
+        function debouncedSync() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(syncPgnToUrl, 300);
+        }
+
+        window.addEventListener('load', function () {
+            var ta = document.getElementById('textbox_pgn_input');
+            if (ta) {
+                // Catch user-typed input
+                ta.addEventListener('input', debouncedSync);
+                ta.addEventListener('change', debouncedSync);
+            }
+            // Poll for programmatic changes (app writes .value directly without firing events)
+            setInterval(debouncedSync, 500);
+        });
+    })();
+    </script>
 </body>
 
 </html>
