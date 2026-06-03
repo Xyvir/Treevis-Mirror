@@ -1,4 +1,4 @@
-# Treevis-Mirror
+# Treevis X
 
 [View the live mirror here](https://xyvir.github.io/Treevis-Mirror/)
 
